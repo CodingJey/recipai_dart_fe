@@ -1,0 +1,15 @@
+{
+    "Chicken": [
+      {"name": "Chicken Breast"},
+      {"name": "Chicken Thigh"},
+      {"name": "Chicken Wings"},
+      {"name": "Whole Chicken"},
+      {"name": "Ground Chicken"}
+    ],
+    "Egg": [
+      {"name": "Boiled Egg"},
+      {"name": "Fried Egg"},
+      {"name": "Scrambled Egg"},
+      {"name": "Poached Egg"}
+    ]
+  }

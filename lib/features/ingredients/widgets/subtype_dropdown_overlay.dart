@@ -1,7 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../../../../data/models/image_item.dart';
-import '../../../../data/models/subtype_detail.dart';
+import '../../../data/models/image_item.dart';
+import '../../../data/models/subtype_detail.dart'; // Ensure this points to the updated (name-only) SubtypeDetail
 
 class SubtypeDropdownOverlay extends StatefulWidget {
   final ValueNotifier<ImageItem> itemNotifier;
@@ -48,7 +47,6 @@ class _SubtypeDropdownOverlayState extends State<SubtypeDropdownOverlay>
   }
 
   void _handleSubtypeTap(SubtypeDetail subtypeDetail) {
-    // 1. Initiate the data change up the tree
     widget.onSubtypeToggled(subtypeDetail.name);
   }
 
@@ -57,7 +55,6 @@ class _SubtypeDropdownOverlayState extends State<SubtypeDropdownOverlay>
     final ThemeData theme = Theme.of(context);
 
     return ValueListenableBuilder<ImageItem>(
-      // NEW: Listen to the notifier
       valueListenable: widget.itemNotifier,
       builder: (context, currentItem, child) {
         return Material(
@@ -98,7 +95,7 @@ class _SubtypeDropdownOverlayState extends State<SubtypeDropdownOverlay>
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            "Select type(s) for ${currentItem.name}", // Updated title
+                            "Select type(s) for ${currentItem.name}",
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 20,
@@ -112,16 +109,17 @@ class _SubtypeDropdownOverlayState extends State<SubtypeDropdownOverlay>
                           Flexible(
                             child: ListView.separated(
                               shrinkWrap: true,
-                              itemCount: currentItem.subtypes.length,
+                              itemCount: currentItem
+                                  .subtypes
+                                  .length, // Subtypes now only have 'name'
                               separatorBuilder: (_, __) => Divider(
                                 height: 1,
                                 thickness: 0.5,
                                 color: Colors.grey[300],
                               ),
                               itemBuilder: (context, index) {
-                                final subtypeDetail =
-                                    currentItem.subtypes[index];
-                                // Check if this subtype is in the selected list
+                                final subtypeDetail = currentItem
+                                    .subtypes[index]; // This is the updated SubtypeDetail
                                 final bool isSubtypeSelected = currentItem
                                     .selectedSubtypeNames
                                     .contains(subtypeDetail.name);
@@ -129,7 +127,7 @@ class _SubtypeDropdownOverlayState extends State<SubtypeDropdownOverlay>
                                 return CheckboxListTile(
                                   key: ValueKey(subtypeDetail.name),
                                   title: Text(
-                                    subtypeDetail.name,
+                                    subtypeDetail.name, // Display the name
                                     style: TextStyle(
                                       fontSize: 16,
                                       color: isSubtypeSelected
@@ -142,39 +140,12 @@ class _SubtypeDropdownOverlayState extends State<SubtypeDropdownOverlay>
                                   ),
                                   value: isSubtypeSelected,
                                   onChanged: (bool? newValue) {
-                                    // onChanged handles tap
                                     _handleSubtypeTap(subtypeDetail);
                                   },
-                                  secondary: ClipRRect(
-                                    // Leading/Secondary for image
-                                    borderRadius: BorderRadius.circular(8.0),
-                                    child: Image.asset(
-                                      subtypeDetail.assetPath,
-                                      width: 40, // Slightly smaller to fit well
-                                      height: 40,
-                                      fit: BoxFit.scaleDown,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                            return Container(
-                                              width: 40,
-                                              height: 40,
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey[200],
-                                                borderRadius:
-                                                    BorderRadius.circular(8.0),
-                                              ),
-                                              child: Icon(
-                                                Icons.broken_image,
-                                                size: 24,
-                                                color: Colors.grey[400],
-                                              ),
-                                            );
-                                          },
-                                    ),
-                                  ),
+                                  // No 'secondary' widget for an image
                                   activeColor: theme.primaryColor,
-                                  controlAffinity: ListTileControlAffinity
-                                      .trailing, // Checkbox on the right
+                                  controlAffinity:
+                                      ListTileControlAffinity.trailing,
                                   contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 8,
                                     vertical: 4,

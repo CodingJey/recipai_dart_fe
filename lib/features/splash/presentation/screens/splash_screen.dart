@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../../../ingredient_selector/presentation/screens/image_box_screen.dart'; // Updated import
+import 'package:go_router/go_router.dart';
+import '../../../../app_router.dart'; // Your AppRouter for path constants
 
-// Splash Screen (largely the same, imports updated)
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -12,6 +12,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
+  // ... (animations and dispose method remain the same) ...
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -30,19 +31,11 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
     );
     _animationController.forward();
-    Timer(const Duration(seconds: 1, milliseconds: 500), () {
+
+    Timer(const Duration(seconds: 2, milliseconds: 300), () {
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const ImageBoxScreen(), // Make sure ImageBoxScreen is const constructible if possible
-            transitionDuration: const Duration(milliseconds: 600),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-                  return FadeTransition(opacity: animation, child: child);
-                },
-          ),
-        );
+        // Navigate to the new Category Selection Screen
+        context.go(AppRouter.categoriesPath); // <--- UPDATED NAVIGATION TARGET
       }
     });
   }
@@ -55,6 +48,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ... (build method UI remains the same) ...
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(

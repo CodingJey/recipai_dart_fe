@@ -1,20 +1,20 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../../../../data/models/image_item.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../data/models/image_item.dart';
+import '../bloc/ingredient_bloc.dart';
 import 'subtype_dropdown_overlay.dart';
 
 class ImageBoxWidget extends StatefulWidget {
   final ImageItem item;
   final bool isSelected;
-  final VoidCallback onTap;
-  final Function(String subtypeNameToggled) onSubtypeToggled;
+  final VoidCallback
+  onTap; // Called by ImageBoxScreen to dispatch BLoC event for selection
 
   const ImageBoxWidget({
     super.key,
     required this.item,
     required this.isSelected,
     required this.onTap,
-    required this.onSubtypeToggled,
   });
 
   @override
@@ -34,13 +34,15 @@ class _ImageBoxWidgetState extends State<ImageBoxWidget> {
   @override
   void didUpdateWidget(covariant ImageBoxWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Always update the notifier when the widget updates
-    _itemNotifier.value = widget.item;
+    if (widget.item != oldWidget.item) {
+      _itemNotifier.value = widget.item;
+    }
   }
 
   @override
   void dispose() {
     _itemNotifier.dispose();
+    // Ensure overlay is removed if widget is disposed while overlay is visible
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _removeDropdownOverlay();
     });
@@ -49,6 +51,7 @@ class _ImageBoxWidgetState extends State<ImageBoxWidget> {
 
   void _removeDropdownOverlay() {
     if (_dropdownOverlayEntry != null) {
+      // Check mounted status before removing
       if (_dropdownOverlayEntry!.mounted) {
         _dropdownOverlayEntry!.remove();
       }
@@ -61,37 +64,20 @@ class _ImageBoxWidgetState extends State<ImageBoxWidget> {
   }
 
   void _openDropdown() {
-    if (_dropdownOverlayEntry != null) return;
+    if (_dropdownOverlayEntry != null || widget.item.subtypes.isEmpty) return;
 
     _dropdownOverlayEntry = OverlayEntry(
       builder: (context) => SubtypeDropdownOverlay(
-        itemNotifier: _itemNotifier,
+        itemNotifier: _itemNotifier, // Pass the notifier
         onSubtypeToggled: (String subtypeNameToggled) {
-          // Call the parent's callback
-          widget.onSubtypeToggled(subtypeNameToggled);
-
-          // Update local notifier immediately for UI responsiveness
-          final currentItem = _itemNotifier.value;
-          final currentSelected = List<String>.from(
-            currentItem.selectedSubtypeNames,
+          // Dispatch event to BLoC for subtype toggle
+          context.read<IngredientBloc>().add(
+            ToggleItemSubtypeEvent(widget.item.id, subtypeNameToggled),
           );
-
-          if (currentSelected.contains(subtypeNameToggled)) {
-            currentSelected.remove(subtypeNameToggled);
-          } else {
-            currentSelected.add(subtypeNameToggled);
-          }
-
-          final updatedItem = currentItem.copyWith(
-            selectedSubtypeNames: currentSelected,
-          );
-
-          _itemNotifier.value = updatedItem;
         },
         closeDropdown: _closeDropdown,
       ),
     );
-
     Overlay.of(context).insert(_dropdownOverlayEntry!);
   }
 
@@ -109,12 +95,10 @@ class _ImageBoxWidgetState extends State<ImageBoxWidget> {
   Widget build(BuildContext context) {
     double borderWidth = widget.isSelected ? 3.0 : 0.0;
     double clipRadius = 12.0 - borderWidth;
-
-    // Create a comma-separated string of selected subtypes, or an empty string
     String selectedSubtypesText = widget.item.selectedSubtypeNames.join(', ');
 
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: widget.onTap, // This callback is provided by ImageBoxScreen
       onLongPress: widget.item.subtypes.isNotEmpty ? _toggleDropdown : null,
       child: Container(
         decoration: BoxDecoration(
@@ -175,7 +159,6 @@ class _ImageBoxWidgetState extends State<ImageBoxWidget> {
                         ],
                       ),
                     ),
-                    // Display selected subtypes if any
                     if (selectedSubtypesText.isNotEmpty)
                       Container(
                         margin: const EdgeInsets.only(top: 3),
@@ -198,7 +181,6 @@ class _ImageBoxWidgetState extends State<ImageBoxWidget> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    // "Choose type" prompt
                     if (widget.isSelected &&
                         widget.item.selectedSubtypeNames.isEmpty &&
                         widget.item.subtypes.isNotEmpty)
@@ -221,12 +203,12 @@ class _ImageBoxWidgetState extends State<ImageBoxWidget> {
                           ),
                         ),
                       ),
-                    // "Selected" badge
                     if (widget.isSelected &&
                         (widget.item.subtypes.isEmpty ||
                             (widget.item.selectedSubtypeNames.isNotEmpty &&
                                 widget.item.subtypes.isNotEmpty)) &&
-                        selectedSubtypesText.isEmpty)
+                        selectedSubtypesText
+                            .isEmpty) // Adjusted logic for "Selected" badge
                       Container(
                         margin: const EdgeInsets.only(top: 3),
                         padding: const EdgeInsets.symmetric(

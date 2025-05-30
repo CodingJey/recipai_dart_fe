@@ -7,7 +7,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:recipai_app/app.dart';
 
 import 'package:recipai_app/main.dart';
 

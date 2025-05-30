@@ -1,6 +1,11 @@
-class SubtypeDetail {
-  final String name;
-  final String assetPath;
+import 'package:equatable/equatable.dart'; // Optional: for equality if needed
 
-  SubtypeDetail({required this.name, required this.assetPath});
+class SubtypeDetail extends Equatable {
+  // Made it Equatable for good measure
+  final String name;
+
+  const SubtypeDetail({required this.name});
+
+  @override
+  List<Object?> get props => [name];
 }
