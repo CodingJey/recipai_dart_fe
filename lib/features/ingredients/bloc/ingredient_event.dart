@@ -1,5 +1,6 @@
 part of 'ingredient_bloc.dart';
 
+// ... (LoadIngredients, ToggleItemSelectionEvent, ToggleItemSubtypeEvent, SaveSelectedItemsAndProceed remain the same) ...
 abstract class IngredientEvent extends Equatable {
   const IngredientEvent();
   @override
@@ -25,12 +26,14 @@ class ToggleItemSubtypeEvent extends IngredientEvent {
 
 class SaveSelectedItemsAndProceed extends IngredientEvent {}
 
-// NEW EVENT
+// UPDATED EVENT
 class SetDisplayCategory extends IngredientEvent {
-  final String categoryName;
+  final String categoryId; // <-- CHANGED to categoryId
 
-  const SetDisplayCategory(this.categoryName);
+  const SetDisplayCategory(this.categoryId);
 
   @override
-  List<Object> get props => [categoryName];
+  List<Object> get props => [categoryId];
 }
+
+class ShowAllIngredients extends IngredientEvent {}

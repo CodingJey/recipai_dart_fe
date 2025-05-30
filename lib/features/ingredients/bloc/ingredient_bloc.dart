@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:recipai_app/data/models/ingredient_category.dart';
+import 'package:recipai_app/data/sources/category_data.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/sources/ingredient_data.dart';
 // data models - ensure paths are correct relative to this BLoC file
@@ -18,10 +20,12 @@ final List<Map<String, dynamic>> _baseIngredientDefinitions = baseIngredients;
 class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
   Map<String, List<SubtypeDetail>> _staticSubtypeData = {};
   List<ImageItem> _masterIngredientList = []; // To store all loaded ingredients
+  List<IngredientCategory> _allCategories = []; // Declared here
 
   IngredientBloc() : super(IngredientInitial()) {
     on<LoadIngredients>(_onLoadIngredients);
-    on<SetDisplayCategory>(_onSetDisplayCategory); // Register new event handler
+    on<SetDisplayCategory>(_onSetDisplayCategory);
+    on<ShowAllIngredients>(_onShowAllIngredients);
     on<ToggleItemSelectionEvent>(_onToggleItemSelection);
     on<ToggleItemSubtypeEvent>(_onToggleItemSubtype);
     on<SaveSelectedItemsAndProceed>(_onSaveSelectedItemsAndProceed);
@@ -32,6 +36,9 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
     Emitter<IngredientState> emit,
   ) async {
     emit(IngredientLoading());
+    _allCategories = List.from(
+      ingredientCategories,
+    ); // Assuming ingredientCategories is your global list
     try {
       final String subtypeJsonString = await rootBundle.loadString(
         'assets/data/ingredient_subtypes.json',
@@ -54,15 +61,14 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
         final String itemName = itemDef['name'] as String;
         final List<SubtypeDetail> subtypesForItem =
             _staticSubtypeData[itemName] ?? [];
-        final String categoryName =
-            itemDef['categoryName'] as String? ??
-            'Uncategorized'; // Get categoryName
+        final String categoryId =
+            itemDef['categoryId'] as String? ?? 'uncategorized';
 
         return ImageItem(
           id: itemDef['id'] as int,
           name: itemName,
           imageUrl: itemDef['imageUrl'] as String,
-          categoryName: categoryName, // Pass categoryName
+          categoryId: categoryId,
           subtypes: subtypesForItem,
           selectedSubtypeNames: [],
         );
@@ -71,15 +77,45 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
       emit(
         IngredientLoaded(
           allMasterItems: _masterIngredientList,
-          displayedAvailableItems:
-              _masterIngredientList, // Initially display all
+          displayedAvailableItems: _masterIngredientList,
           selectedItems: [],
-          currentCategoryName: null, // No category selected initially
+          currentCategoryId: null,
+          currentCategoryDisplayName: null,
         ),
       );
     } catch (e) {
       print("Error loading ingredients: $e");
       emit(IngredientError("Failed to load ingredients: ${e.toString()}"));
+    }
+  }
+
+  void _onShowAllIngredients(
+    ShowAllIngredients event,
+    Emitter<IngredientState> emit,
+  ) {
+    print("[Bloc._onShowAllIngredients] Received event.");
+    if (state is IngredientLoaded) {
+      final currentState = state as IngredientLoaded;
+      emit(
+        currentState.copyWith(
+          displayedAvailableItems:
+              currentState.allMasterItems, // Show all items
+          currentCategoryId: null, // Clear category ID
+          currentCategoryDisplayName: null, // Clear category display name
+          // Ensure allMasterItems and selectedItems are preserved by copyWith
+          allMasterItems: currentState.allMasterItems,
+          selectedItems: currentState.selectedItems,
+        ),
+      );
+      print(
+        "[Bloc._onShowAllIngredients] Emitted state to display all items. Displayed: ${currentState.allMasterItems.length}",
+      );
+    } else {
+      print(
+        "[Bloc._onShowAllIngredients] Current state is NOT IngredientLoaded. State: $state.",
+      );
+      // If not loaded yet, LoadIngredients should handle showing all by default.
+      // This event primarily makes sense if ingredients are already loaded.
     }
   }
 
@@ -89,22 +125,70 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
   ) {
     if (state is IngredientLoaded) {
       final currentState = state as IngredientLoaded;
-      final categoryName = event.categoryName;
-      final filteredItems = _masterIngredientList
-          .where((item) => item.categoryName == categoryName)
-          .toList();
+      final newTargetCategoryId = event.categoryId;
 
-      emit(
-        currentState.copyWith(
-          displayedAvailableItems: filteredItems,
-          currentCategoryName: categoryName,
-          // Potentially reset selectedItems if category changes, or handle selections across categories
-          // For now, selectedItems are preserved.
-        ),
+      print(
+        "[Bloc._onSetDisplayCategory] Current BLoC state before update: currentCategoryId='${currentState.currentCategoryId}', displayedItemsCount=${currentState.displayedAvailableItems.length}",
+      );
+      print(
+        "[Bloc._onSetDisplayCategory] _allCategories count: ${_allCategories.length}",
+      ); // Check if _allCategories is populated
+
+      final filteredItems =
+          _masterIngredientList // Filter from the BLoC's master list
+              .where((item) => item.categoryId == newTargetCategoryId)
+              .toList();
+
+      String? newCategoryDisplayName;
+      if (_allCategories.isNotEmpty) {
+        // Ensure _allCategories is not empty before using firstWhere
+        try {
+          newCategoryDisplayName = _allCategories
+              .firstWhere((cat) => cat.id == newTargetCategoryId)
+              .name;
+        } catch (e) {
+          newCategoryDisplayName = "Category (ID: $newTargetCategoryId)";
+          print(
+            "[Bloc._onSetDisplayCategory] Warning: Could not find display name for category ID '$newTargetCategoryId' in _allCategories. Error: $e",
+          );
+        }
+      } else {
+        newCategoryDisplayName = "Category (ID: $newTargetCategoryId)";
+        print(
+          "[Bloc._onSetDisplayCategory] Warning: _allCategories list is empty. Cannot find display name.",
+        );
+      }
+
+      print(
+        "[Bloc._onSetDisplayCategory] Filtering complete. For categoryId='${newTargetCategoryId}', found ${filteredItems.length} items. DisplayName='${newCategoryDisplayName}'",
+      );
+
+      final newState = currentState.copyWith(
+        displayedAvailableItems: filteredItems,
+        currentCategoryId: newTargetCategoryId,
+        currentCategoryDisplayName: newCategoryDisplayName,
+        allMasterItems:
+            currentState.allMasterItems, // Ensure these are carried over
+        selectedItems: currentState.selectedItems,
+      );
+
+      emit(newState);
+
+      print(
+        "[Bloc._onSetDisplayCategory] EMITTED new state: currentCategoryId='${newState.currentCategoryId}', currentCategoryDisplayName='${newState.currentCategoryDisplayName}', displayedItemsCount=${newState.displayedAvailableItems.length}",
+      );
+    } else {
+      print(
+        "[Bloc._onSetDisplayCategory] Current state is NOT IngredientLoaded. State: $state. Event for '${event.categoryId}' will not be fully processed.",
       );
     }
   }
 
+  // ... rest of _onToggleItemSelection, _onToggleItemSubtype, _onSaveSelectedItemsAndProceed
+  // These should remain as in the previous fully corrected version, ensuring they use
+  // currentState.currentCategoryId and currentState.currentCategoryDisplayName when emitting new states via copyWith,
+  // and re-filter displayedAvailableItems from the updated _masterIngredientList.
+  // For brevity, I'm not repeating them here but ensure they are complete from the prior correct version.
   void _onToggleItemSelection(
     ToggleItemSelectionEvent event,
     Emitter<IngredientState> emit,
@@ -132,7 +216,6 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
           (selected) => selected.id == itemToToggle.id,
         );
         if (masterItemIndex != -1) {
-          // Clear subtypes of the item in the master list when fully deselected from the top
           newMasterItems[masterItemIndex] = newMasterItems[masterItemIndex]
               .copyWith(selectedSubtypeNames: []);
         }
@@ -141,18 +224,14 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
           // Add the version from the master list (which reflects current subtype selections)
           newSelectedItems.add(newMasterItems[masterItemIndex]);
         } else {
-          // Should not happen if item came from UI displaying master/displayed items
-          newSelectedItems.add(
-            itemToToggle.copyWith(categoryName: itemToToggle.categoryName),
-          );
+          newSelectedItems.add(itemToToggle.copyWith());
         }
       }
 
-      // Re-filter displayed items based on the current category if master items were modified
-      final String? currentCategory = currentState.currentCategoryName;
-      final List<ImageItem> newDisplayedItems = currentCategory != null
+      final String? currentCatId = currentState.currentCategoryId;
+      final List<ImageItem> newDisplayedItems = currentCatId != null
           ? newMasterItems
-                .where((item) => item.categoryName == currentCategory)
+                .where((item) => item.categoryId == currentCatId)
                 .toList()
           : newMasterItems;
 
@@ -162,6 +241,7 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
               newMasterItems, // Persist changes to master list (e.g. cleared subtypes)
           displayedAvailableItems: newDisplayedItems,
           selectedItems: newSelectedItems,
+          // currentCategoryId and currentCategoryDisplayName are preserved by copyWith by default
         ),
       );
     }
@@ -177,15 +257,17 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
       // Update in the master list
       List<ImageItem> newMasterItems = currentState.allMasterItems.map((item) {
         if (item.id == event.itemId) {
-          List<String> currentSelectedSubtypes = List.from(
+          List<String> currentSelectedSubtypeNames = List.from(
             item.selectedSubtypeNames,
           );
-          if (currentSelectedSubtypes.contains(event.subtypeNameToggled)) {
-            currentSelectedSubtypes.remove(event.subtypeNameToggled);
+          if (currentSelectedSubtypeNames.contains(event.subtypeNameToggled)) {
+            currentSelectedSubtypeNames.remove(event.subtypeNameToggled);
           } else {
-            currentSelectedSubtypes.add(event.subtypeNameToggled);
+            currentSelectedSubtypeNames.add(event.subtypeNameToggled);
           }
-          return item.copyWith(selectedSubtypeNames: currentSelectedSubtypes);
+          return item.copyWith(
+            selectedSubtypeNames: currentSelectedSubtypeNames,
+          );
         }
         return item;
       }).toList();
@@ -200,11 +282,10 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
         return item;
       }).toList();
 
-      // Re-filter displayed items based on the current category
-      final String? currentCategory = currentState.currentCategoryName;
-      final List<ImageItem> newDisplayedItems = currentCategory != null
+      final String? currentCatId = currentState.currentCategoryId;
+      final List<ImageItem> newDisplayedItems = currentCatId != null
           ? newMasterItems
-                .where((item) => item.categoryName == currentCategory)
+                .where((item) => item.categoryId == currentCatId)
                 .toList()
           : newMasterItems;
 
@@ -219,20 +300,20 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
   }
 
   Future<void> _onSaveSelectedItemsAndProceed(
-    /* ... as before ... */
     SaveSelectedItemsAndProceed event,
     Emitter<IngredientState> emit,
   ) async {
     if (state is IngredientLoaded) {
-      final currentLoadedState =
-          state as IngredientLoaded; // Cast to access all fields
+      final currentLoadedState = state as IngredientLoaded;
       emit(
         SelectedItemsSaving(
           // Pass all relevant fields from currentLoadedState
           allMasterItems: currentLoadedState.allMasterItems,
           displayedAvailableItems: currentLoadedState.displayedAvailableItems,
           selectedItems: currentLoadedState.selectedItems,
-          currentCategoryName: currentLoadedState.currentCategoryName,
+          currentCategoryId: currentLoadedState.currentCategoryId,
+          currentCategoryDisplayName:
+              currentLoadedState.currentCategoryDisplayName,
         ),
       );
       try {
@@ -252,7 +333,9 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
             allMasterItems: currentLoadedState.allMasterItems,
             displayedAvailableItems: currentLoadedState.displayedAvailableItems,
             selectedItems: currentLoadedState.selectedItems,
-            currentCategoryName: currentLoadedState.currentCategoryName,
+            currentCategoryId: currentLoadedState.currentCategoryId,
+            currentCategoryDisplayName:
+                currentLoadedState.currentCategoryDisplayName,
           ),
         );
       } catch (e) {
@@ -263,7 +346,9 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
             allMasterItems: currentLoadedState.allMasterItems,
             displayedAvailableItems: currentLoadedState.displayedAvailableItems,
             selectedItems: currentLoadedState.selectedItems,
-            currentCategoryName: currentLoadedState.currentCategoryName,
+            currentCategoryId: currentLoadedState.currentCategoryId,
+            currentCategoryDisplayName:
+                currentLoadedState.currentCategoryDisplayName,
           ),
         );
       }

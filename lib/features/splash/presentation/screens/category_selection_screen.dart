@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:recipai_app/features/ingredients/bloc/ingredient_bloc.dart';
 import '../../../../app_router.dart'; // Your AppRouter for path constants
 import '../../../../data/models/ingredient_category.dart';
 import '../../../../data/sources/category_data.dart'; // Your static category data
@@ -26,6 +28,22 @@ class CategorySelectionScreen extends StatelessWidget {
           return CategoryCard(category: category);
         },
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          print("[CategorySelectionScreen] FAB tapped for 'All Ingredients'");
+          // Dispatch event to BLoC to show all ingredients
+          context.read<IngredientBloc>().add(ShowAllIngredients());
+          // Navigate to ImageBoxScreen.
+          // No 'extra' is needed as we want the default "all items" view.
+          context.push(AppRouter.ingredientsPath);
+        },
+        label: const Text('All Ingredients'),
+        icon: const Icon(Icons.list_alt_rounded),
+        backgroundColor:
+            theme.colorScheme.secondary, // Use accent/secondary color
+        foregroundColor:
+            theme.colorScheme.onSecondary, // Text color for secondary
+      ),
     );
   }
 }
@@ -47,7 +65,11 @@ class CategoryCard extends StatelessWidget {
         onTap: () {
           // For now, navigate to the general ingredients screen.
           // Later, you might pass category.name or an ID to filter.
-          context.push(AppRouter.ingredientsPath);
+          context.read<IngredientBloc>().add(SetDisplayCategory(category.id));
+          context.push(
+            AppRouter.ingredientsPath,
+            extra: {'id': category.id, 'name': category.name},
+          );
         },
         splashColor: theme.primaryColor.withOpacity(0.3),
         child: Container(

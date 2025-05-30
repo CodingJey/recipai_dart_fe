@@ -11,17 +11,18 @@ class IngredientInitial extends IngredientState {}
 class IngredientLoading extends IngredientState {}
 
 class IngredientLoaded extends IngredientState {
-  final List<ImageItem> allMasterItems; // All ingredients loaded
-  final List<ImageItem>
-  displayedAvailableItems; // Filtered ingredients for display
+  final List<ImageItem> allMasterItems;
+  final List<ImageItem> displayedAvailableItems;
   final List<ImageItem> selectedItems;
-  final String? currentCategoryName; // Name of the currently selected category
+  final String? currentCategoryId; // <-- CHANGED from currentCategoryName
+  final String? currentCategoryDisplayName; // To store the name for UI
 
   const IngredientLoaded({
     this.allMasterItems = const [],
     this.displayedAvailableItems = const [],
     this.selectedItems = const [],
-    this.currentCategoryName,
+    this.currentCategoryId,
+    this.currentCategoryDisplayName,
   });
 
   @override
@@ -29,24 +30,29 @@ class IngredientLoaded extends IngredientState {
     allMasterItems,
     displayedAvailableItems,
     selectedItems,
-    currentCategoryName ?? '',
+    currentCategoryId ?? '',
+    currentCategoryDisplayName ?? '',
   ];
 
   IngredientLoaded copyWith({
     List<ImageItem>? allMasterItems,
     List<ImageItem>? displayedAvailableItems,
     List<ImageItem>? selectedItems,
-    String? currentCategoryName, // Use String? for nullable currentCategoryName
-    bool clearCurrentCategory = false, // Flag to explicitly clear category
+    String? currentCategoryId,
+    String? currentCategoryDisplayName, // Add to copyWith
+    bool clearCurrentCategory = false,
   }) {
     return IngredientLoaded(
       allMasterItems: allMasterItems ?? this.allMasterItems,
       displayedAvailableItems:
           displayedAvailableItems ?? this.displayedAvailableItems,
       selectedItems: selectedItems ?? this.selectedItems,
-      currentCategoryName: clearCurrentCategory
+      currentCategoryId: clearCurrentCategory
           ? null
-          : (currentCategoryName ?? this.currentCategoryName),
+          : (currentCategoryId ?? this.currentCategoryId),
+      currentCategoryDisplayName: clearCurrentCategory
+          ? null
+          : (currentCategoryDisplayName ?? this.currentCategoryDisplayName),
     );
   }
 }
@@ -59,21 +65,20 @@ class IngredientError extends IngredientState {
   List<Object> get props => [message];
 }
 
-// Update these to carry the new IngredientLoaded structure if needed,
-// or ensure they correctly reflect the data they operate on.
-// For simplicity, let's make them extend a simple IngredientLoaded for now.
-
+// Update these to carry the new IngredientLoaded structure
 class SelectedItemsSaving extends IngredientLoaded {
   const SelectedItemsSaving({
     required List<ImageItem> allMasterItems,
     required List<ImageItem> displayedAvailableItems,
     required List<ImageItem> selectedItems,
-    String? currentCategoryName,
+    String? currentCategoryId,
+    String? currentCategoryDisplayName,
   }) : super(
          allMasterItems: allMasterItems,
          displayedAvailableItems: displayedAvailableItems,
          selectedItems: selectedItems,
-         currentCategoryName: currentCategoryName,
+         currentCategoryId: currentCategoryId,
+         currentCategoryDisplayName: currentCategoryDisplayName,
        );
 }
 
@@ -82,12 +87,14 @@ class SelectedItemsSaveSuccess extends IngredientLoaded {
     required List<ImageItem> allMasterItems,
     required List<ImageItem> displayedAvailableItems,
     required List<ImageItem> selectedItems,
-    String? currentCategoryName,
+    String? currentCategoryId,
+    String? currentCategoryDisplayName,
   }) : super(
          allMasterItems: allMasterItems,
          displayedAvailableItems: displayedAvailableItems,
          selectedItems: selectedItems,
-         currentCategoryName: currentCategoryName,
+         currentCategoryId: currentCategoryId,
+         currentCategoryDisplayName: currentCategoryDisplayName,
        );
 }
 
@@ -98,12 +105,14 @@ class SelectedItemsSaveError extends IngredientLoaded {
     required List<ImageItem> allMasterItems,
     required List<ImageItem> displayedAvailableItems,
     required List<ImageItem> selectedItems,
-    String? currentCategoryName,
+    String? currentCategoryId,
+    String? currentCategoryDisplayName,
   }) : super(
          allMasterItems: allMasterItems,
          displayedAvailableItems: displayedAvailableItems,
          selectedItems: selectedItems,
-         currentCategoryName: currentCategoryName,
+         currentCategoryId: currentCategoryId,
+         currentCategoryDisplayName: currentCategoryDisplayName,
        );
 
   @override

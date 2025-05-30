@@ -4,6 +4,7 @@ import 'package:recipai_app/features/splash/presentation/screens/category_select
 import 'features/ingredients/presentation/screens/image_box_screen.dart';
 // import 'features/summary/screens/summary_screen.dart';
 import 'features/splash/presentation/screens/splash_screen.dart'; // Import SplashScreen
+import 'data/models/ingredient_category.dart';
 
 class AppRouter {
   static const String splashPath = '/splash';
@@ -29,10 +30,13 @@ class AppRouter {
       GoRoute(
         path: ingredientsPath,
         builder: (BuildContext context, GoRouterState state) {
-          // Later, you might receive a categoryId or name here from the state
-          // final String? categoryId = state.pathParameters['categoryId'];
-          // final String? categoryName = state.extra as String?;
-          return const ImageBoxScreen(); // For now, it shows all ingredients
+          // Expect a map with 'id' and 'name' for the category
+          final Map<String, String>? categoryInfo =
+              state.extra as Map<String, String>?;
+          return ImageBoxScreen(
+            targetCategoryId: categoryInfo?['id'],
+            targetCategoryDisplayName: categoryInfo?['name'],
+          );
         },
       ),
       // GoRoute(

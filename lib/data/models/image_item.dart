@@ -6,7 +6,7 @@ class ImageItem extends Equatable {
   final String name;
   final String imageUrl;
   final int id;
-  final String categoryName;
+  final String categoryId;
   final List<SubtypeDetail> subtypes;
   final List<String> selectedSubtypeNames;
 
@@ -14,7 +14,7 @@ class ImageItem extends Equatable {
     required this.id,
     required this.name,
     required this.imageUrl,
-    required this.categoryName,
+    required this.categoryId,
     required this.subtypes,
     List<String>? selectedSubtypeNames,
   }) : selectedSubtypeNames = selectedSubtypeNames ?? [];
@@ -23,7 +23,7 @@ class ImageItem extends Equatable {
     String? name,
     String? imageUrl,
     int? id,
-    String? categoryName,
+    String? categoryId,
     List<SubtypeDetail>? subtypes,
     List<String>? selectedSubtypeNames,
   }) {
@@ -31,7 +31,7 @@ class ImageItem extends Equatable {
       id: id ?? this.id,
       name: name ?? this.name,
       imageUrl: imageUrl ?? this.imageUrl,
-      categoryName: categoryName ?? this.categoryName,
+      categoryId: categoryId ?? this.categoryId,
       subtypes: subtypes ?? this.subtypes,
       selectedSubtypeNames: selectedSubtypeNames != null
           ? List<String>.from(selectedSubtypeNames)
@@ -44,7 +44,7 @@ class ImageItem extends Equatable {
     id,
     name,
     imageUrl,
-    categoryName,
+    categoryId,
     subtypes,
     selectedSubtypeNames,
   ];
@@ -54,7 +54,7 @@ class ImageItem extends Equatable {
       'id': id,
       'name': name,
       'imageUrl': imageUrl,
-      'categoryName': categoryName,
+      'categoryId': categoryId,
       'selectedSubtypeNames': selectedSubtypeNames,
     };
   }
@@ -64,7 +64,7 @@ class ImageItem extends Equatable {
       id: json['id'] as int,
       name: json['name'] as String,
       imageUrl: json['imageUrl'] as String,
-      categoryName: json['categoryName'] as String? ?? '',
+      categoryId: json['categoryId'] as String? ?? '',
       subtypes: [],
       selectedSubtypeNames: List<String>.from(
         json['selectedSubtypeNames'] as List,

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:flutter_bloc/flutter_bloc.dart'; // Import Bloc
 import 'package:go_router/go_router.dart';
-import '../../../../app_router.dart'; // Your AppRouter for path constants
+import '../../../../app_router.dart';
+import '../../../ingredients/bloc/ingredient_bloc.dart'; // Import your BLoC and states
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,10 +14,10 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  // ... (animations and dispose method remain the same) ...
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  StreamSubscription? _blocSubscription; // To listen to BLoC state changes
 
   @override
   void initState() {
@@ -32,17 +34,61 @@ class _SplashScreenState extends State<SplashScreen>
     );
     _animationController.forward();
 
-    Timer(const Duration(seconds: 2, milliseconds: 300), () {
-      if (mounted) {
-        // Navigate to the new Category Selection Screen
-        context.go(AppRouter.categoriesPath); // <--- UPDATED NAVIGATION TARGET
-      }
-    });
+    // Listen to IngredientBloc for initial load completion
+    final ingredientBloc = context.read<IngredientBloc>();
+
+    // Check current state first - useful for hot restarts
+    if (ingredientBloc.state is IngredientLoaded) {
+      print(
+        "[SplashScreen] Ingredients already loaded, navigating immediately.",
+      );
+      _navigateToCategories();
+    } else {
+      print("[SplashScreen] Subscribing to IngredientBloc stream.");
+      _blocSubscription = ingredientBloc.stream.listen((blocState) {
+        print("[SplashScreen] Received BLoC state: ${blocState.runtimeType}");
+        if (blocState is IngredientLoaded) {
+          print(
+            "[SplashScreen] IngredientLoaded state received, navigating to categories.",
+          );
+          _navigateToCategories();
+        } else if (blocState is IngredientError) {
+          print(
+            "[SplashScreen] IngredientError state received: ${blocState.message}. Navigating anyway or to an error screen.",
+          );
+          // Decide how to handle initial load error, for now, navigate to categories
+          _navigateToCategories(); // Or navigate to a dedicated error screen
+        }
+      });
+      // Optional: Fallback timer in case something unexpected happens with the BLoC stream
+      Timer(const Duration(seconds: 7), () {
+        // A reasonable timeout
+        if (mounted &&
+            (_blocSubscription != null ||
+                !(ingredientBloc.state is IngredientLoaded))) {
+          // Check if not yet navigated
+          print(
+            "[SplashScreen] Fallback timer expired, attempting navigation to categories.",
+          );
+          _navigateToCategories();
+        }
+      });
+    }
+  }
+
+  void _navigateToCategories() {
+    _blocSubscription
+        ?.cancel(); // Important to cancel to prevent multiple navigations
+    _blocSubscription = null; // Nullify to avoid re-entry in timer
+    if (mounted) {
+      context.go(AppRouter.categoriesPath);
+    }
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _blocSubscription?.cancel(); // ALWAYS cancel subscriptions in dispose
     super.dispose();
   }
 
@@ -51,13 +97,7 @@ class _SplashScreenState extends State<SplashScreen>
     // ... (build method UI remains the same) ...
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.deepPurple[600]!, Colors.blue[600]!],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
+        // ... (gradient etc.)
         child: Center(
           child: AnimatedBuilder(
             animation: _animationController,
