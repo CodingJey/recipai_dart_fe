@@ -7,9 +7,9 @@ final List<IngredientCategory> ingredientCategories = [
     imagePath: 'assets/images/categories/meat_banner.png',
   ),
   const IngredientCategory(
-    id: 'carbs',
-    name: 'Carbohydrates',
-    imagePath: 'assets/images/categories/carbs_banner.png',
+    id: 'bread_pasta',
+    name: 'Bread & Pasta',
+    imagePath: 'assets/images/categories/bread_pasta_banner.png',
   ),
   const IngredientCategory(
     id: 'vegetables', // <-- EXAMPLE ID
@@ -27,12 +27,12 @@ final List<IngredientCategory> ingredientCategories = [
     imagePath: 'assets/images/categories/meat_banner.png',
   ),
   const IngredientCategory(
-    id: 'spices_herbs', // <-- EXAMPLE ID
+    id: 'spices_herbs',
     name: 'Spices & Herbs',
     imagePath: 'assets/images/categories/meat_banner.png',
   ),
   const IngredientCategory(
-    id: 'grains_cereals', // <-- EXAMPLE ID
+    id: 'grains_cereals',
     name: 'Grains & Cereals',
     imagePath: 'assets/images/categories/vegetables_banner.png',
   ),

@@ -29,6 +29,8 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
     on<ToggleItemSelectionEvent>(_onToggleItemSelection);
     on<ToggleItemSubtypeEvent>(_onToggleItemSubtype);
     on<SaveSelectedItemsAndProceed>(_onSaveSelectedItemsAndProceed);
+    on<SynchronizeSelectedItems>(_onSynchronizeSelectedItems);
+    on<ConfirmSummaryAndProceedToResults>(_onConfirmSummaryAndProceedToResults);
   }
 
   Future<void> _onLoadIngredients(
@@ -93,29 +95,26 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
     ShowAllIngredients event,
     Emitter<IngredientState> emit,
   ) {
-    print("[Bloc._onShowAllIngredients] Received event.");
+    print(
+      "[Bloc._onShowAllIngredients] Received event. Current state BEFORE processing: $state",
+    );
     if (state is IngredientLoaded) {
       final currentState = state as IngredientLoaded;
-      emit(
-        currentState.copyWith(
-          displayedAvailableItems:
-              currentState.allMasterItems, // Show all items
-          currentCategoryId: null, // Clear category ID
-          currentCategoryDisplayName: null, // Clear category display name
-          // Ensure allMasterItems and selectedItems are preserved by copyWith
-          allMasterItems: currentState.allMasterItems,
-          selectedItems: currentState.selectedItems,
-        ),
+      // When clearing, we don't need to pass currentCategoryId/DisplayName arguments to copyWith
+      final newState = currentState.copyWith(
+        displayedAvailableItems: currentState.allMasterItems,
+        clearCurrentCategory:
+            true, // This will set categoryId and displayName to null
+        // allMasterItems and selectedItems will be preserved from currentState by copyWith
       );
+      emit(newState);
       print(
-        "[Bloc._onShowAllIngredients] Emitted state to display all items. Displayed: ${currentState.allMasterItems.length}",
+        "[Bloc._onShowAllIngredients] EMITTED new state: currentCategoryId='${newState.currentCategoryId}', currentCategoryDisplayName='${newState.currentCategoryDisplayName}', displayedItemsCount=${newState.displayedAvailableItems.length}",
       );
     } else {
       print(
-        "[Bloc._onShowAllIngredients] Current state is NOT IngredientLoaded. State: $state.",
+        "[Bloc._onShowAllIngredients] Current state is NOT IngredientLoaded. State: $state. Cannot clear category.",
       );
-      // If not loaded yet, LoadIngredients should handle showing all by default.
-      // This event primarily makes sense if ingredients are already loaded.
     }
   }
 
@@ -123,63 +122,44 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
     SetDisplayCategory event,
     Emitter<IngredientState> emit,
   ) {
+    print(
+      "[Bloc._onSetDisplayCategory] Received event with categoryId: '${event.categoryId}'",
+    );
     if (state is IngredientLoaded) {
       final currentState = state as IngredientLoaded;
       final newTargetCategoryId = event.categoryId;
-
-      print(
-        "[Bloc._onSetDisplayCategory] Current BLoC state before update: currentCategoryId='${currentState.currentCategoryId}', displayedItemsCount=${currentState.displayedAvailableItems.length}",
-      );
-      print(
-        "[Bloc._onSetDisplayCategory] _allCategories count: ${_allCategories.length}",
-      ); // Check if _allCategories is populated
-
-      final filteredItems =
-          _masterIngredientList // Filter from the BLoC's master list
-              .where((item) => item.categoryId == newTargetCategoryId)
-              .toList();
+      // ... (filtering logic for filteredItems and newCategoryDisplayName) ...
+      final filteredItems = _masterIngredientList
+          .where((item) => item.categoryId == newTargetCategoryId)
+          .toList();
 
       String? newCategoryDisplayName;
       if (_allCategories.isNotEmpty) {
-        // Ensure _allCategories is not empty before using firstWhere
         try {
           newCategoryDisplayName = _allCategories
               .firstWhere((cat) => cat.id == newTargetCategoryId)
               .name;
         } catch (e) {
           newCategoryDisplayName = "Category (ID: $newTargetCategoryId)";
-          print(
-            "[Bloc._onSetDisplayCategory] Warning: Could not find display name for category ID '$newTargetCategoryId' in _allCategories. Error: $e",
-          );
         }
       } else {
         newCategoryDisplayName = "Category (ID: $newTargetCategoryId)";
-        print(
-          "[Bloc._onSetDisplayCategory] Warning: _allCategories list is empty. Cannot find display name.",
-        );
       }
-
-      print(
-        "[Bloc._onSetDisplayCategory] Filtering complete. For categoryId='${newTargetCategoryId}', found ${filteredItems.length} items. DisplayName='${newCategoryDisplayName}'",
-      );
 
       final newState = currentState.copyWith(
         displayedAvailableItems: filteredItems,
-        currentCategoryId: newTargetCategoryId,
-        currentCategoryDisplayName: newCategoryDisplayName,
-        allMasterItems:
-            currentState.allMasterItems, // Ensure these are carried over
-        selectedItems: currentState.selectedItems,
+        currentCategoryId: newTargetCategoryId, // Explicitly pass the new ID
+        currentCategoryDisplayName:
+            newCategoryDisplayName, // Explicitly pass the new name
+        // clearCurrentCategory will be false by default, so these values will be used.
       );
-
       emit(newState);
-
       print(
-        "[Bloc._onSetDisplayCategory] EMITTED new state: currentCategoryId='${newState.currentCategoryId}', currentCategoryDisplayName='${newState.currentCategoryDisplayName}', displayedItemsCount=${newState.displayedAvailableItems.length}",
+        "[Bloc._onSetDisplayCategory] EMITTED new state with currentCategoryId: ${newState.currentCategoryId}, currentCategoryDisplayName: ${newState.currentCategoryDisplayName}, displayedAvailableItems count: ${newState.displayedAvailableItems.length}",
       );
     } else {
       print(
-        "[Bloc._onSetDisplayCategory] Current state is NOT IngredientLoaded. State: $state. Event for '${event.categoryId}' will not be fully processed.",
+        "[Bloc._onSetDisplayCategory] State is not IngredientLoaded. Current state is $state",
       );
     }
   }
@@ -352,6 +332,137 @@ class IngredientBloc extends Bloc<IngredientEvent, IngredientState> {
           ),
         );
       }
+    }
+  }
+
+  void _onSynchronizeSelectedItems(
+    SynchronizeSelectedItems event,
+    Emitter<IngredientState> emit,
+  ) {
+    if (state is IngredientLoaded) {
+      final currentState = state as IngredientLoaded;
+      // These items from summary have correct IDs, selectedSubtypeNames, and categoryId,
+      // BUT their 'subtypes' list is empty because they came from ImageItem.fromJson().
+      final List<ImageItem> selectedItemsFromSummary =
+          event.updatedSelectedItems;
+
+      print(
+        "[Bloc._onSynchronizeSelectedItems] Received ${selectedItemsFromSummary.length} items from summary.",
+      );
+
+      // Create a new master list. For each original master item:
+      // - If it's still selected (present in selectedItemsFromSummary), update its selectedSubtypeNames.
+      // - If it's NO LONGER selected, clear its selectedSubtypeNames.
+      // - Crucially, ALWAYS keep the original 'subtypes' list from the masterItem.
+      List<ImageItem> newMasterItems = currentState.allMasterItems.map((
+        masterItem,
+      ) {
+        ImageItem? summaryVersion;
+        try {
+          summaryVersion = selectedItemsFromSummary.firstWhere(
+            (si) => si.id == masterItem.id,
+          );
+        } catch (e) {
+          // Item from master list is not in the new selected list from summary
+          summaryVersion = null;
+        }
+
+        if (summaryVersion != null) {
+          // Item IS in the new selected list from summary.
+          // Update its selectedSubtypeNames from the summary version,
+          // but keep ALL other properties (especially 'subtypes') from the original masterItem.
+          return masterItem.copyWith(
+            selectedSubtypeNames: summaryVersion.selectedSubtypeNames,
+            // categoryId should be inherent to masterItem, but ensure consistency if summary could change it
+            // For now, assuming categoryId from masterItem is authoritative.
+          );
+        } else {
+          // Item from master list is NOT in the new selected list from summary.
+          // This means it was deselected. Clear its selectedSubtypeNames.
+          if (masterItem.selectedSubtypeNames.isNotEmpty) {
+            return masterItem.copyWith(selectedSubtypeNames: []);
+          }
+          // If already empty, no change needed to this masterItem.
+          return masterItem;
+        }
+      }).toList();
+
+      // Create the new 'selectedItems' list for the BLoC state.
+      // These should be instances from 'newMasterItems' to ensure they have the full 'subtypes' list.
+      List<ImageItem> newBlocSelectedItems = [];
+      for (var summaryItemShell in selectedItemsFromSummary) {
+        try {
+          // Find the corresponding (and now updated) item in newMasterItems
+          final fullyHydratedItem = newMasterItems.firstWhere(
+            (mi) => mi.id == summaryItemShell.id,
+          );
+          newBlocSelectedItems.add(fullyHydratedItem);
+        } catch (e) {
+          // This should ideally not happen if IDs are consistent and item was processed in newMasterItems.
+          print(
+            "[Bloc._onSynchronizeSelectedItems] Error: Could not find master item for summary item ID: ${summaryItemShell.id}. This indicates a logic flaw.",
+          );
+        }
+      }
+
+      // Re-filter displayed items based on current category, using the updated master list
+      final String? currentCatId = currentState.currentCategoryId;
+      final List<ImageItem> newDisplayedItems = currentCatId != null
+          ? newMasterItems
+                .where((item) => item.categoryId == currentCatId)
+                .toList()
+          : newMasterItems; // If no category, show all from the updated master list
+
+      emit(
+        currentState.copyWith(
+          allMasterItems: newMasterItems, // Updated master list
+          selectedItems: newBlocSelectedItems, // Hydrated selected items
+          displayedAvailableItems:
+              newDisplayedItems, // Correctly filtered display list
+          // currentCategoryId and currentCategoryDisplayName are preserved by copyWith
+        ),
+      );
+      print(
+        "[Bloc._onSynchronizeSelectedItems] State updated. Master items: ${newMasterItems.length}, BLoC Selected items: ${newBlocSelectedItems.length}, Displayed: ${newDisplayedItems.length}",
+      );
+    } else {
+      print(
+        "[Bloc._onSynchronizeSelectedItems] Current state is NOT IngredientLoaded. State: $state.",
+      );
+    }
+  }
+
+  void _onConfirmSummaryAndProceedToResults(
+    ConfirmSummaryAndProceedToResults event,
+    Emitter<IngredientState> emit,
+  ) {
+    if (state is IngredientLoaded) {
+      final currentState = state as IngredientLoaded;
+      if (currentState.selectedItems.isNotEmpty) {
+        print(
+          "[Bloc] ConfirmSummaryAndProceedToResults: Requesting navigation with ${currentState.selectedItems.length} items.",
+        );
+        // Emit the specific state to trigger navigation in the UI
+        emit(
+          NavigateToRecipeResults(
+            allMasterItems: currentState.allMasterItems,
+            displayedAvailableItems: currentState.displayedAvailableItems,
+            selectedItems:
+                currentState.selectedItems, // These are the confirmed items
+            currentCategoryId: currentState.currentCategoryId,
+            currentCategoryDisplayName: currentState.currentCategoryDisplayName,
+          ),
+        );
+      } else {
+        print(
+          "[Bloc] ConfirmSummaryAndProceedToResults: No items selected, navigation not requested.",
+        );
+        // Optionally, emit a state to show a message, though UI can also handle this.
+      }
+    } else {
+      print(
+        "[Bloc] ConfirmSummaryAndProceedToResults: Current state is not IngredientLoaded ($state).",
+      );
     }
   }
 }

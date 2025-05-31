@@ -37,3 +37,14 @@ class SetDisplayCategory extends IngredientEvent {
 }
 
 class ShowAllIngredients extends IngredientEvent {}
+
+class SynchronizeSelectedItems extends IngredientEvent {
+  final List<ImageItem> updatedSelectedItems;
+
+  const SynchronizeSelectedItems(this.updatedSelectedItems);
+
+  @override
+  List<Object> get props => [updatedSelectedItems];
+}
+
+class ConfirmSummaryAndProceedToResults extends IngredientEvent {}
